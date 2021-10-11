@@ -1,0 +1,446 @@
+\documentclass[preprint,amsmath,amssymb,aps,pre]{revtex4-1}
+% Latex
+\usepackage[english]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+% Xelatex
+%\usepackage{polyglossia}
+%\usepackage{fontspec}
+%\setdefaultlanguage{english}
+%\setmainfont{DejaVu Sans}
+%\setsansfont{DejaVu Sans}
+%\setmonofont{DejaVu Sans Mono}
+\usepackage{bm}
+\usepackage{cleveref}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{subfigure}
+
+\definecolor{light-gray}{gray}{0.95}
+\newcommand{\code}[1]{\colorbox{light-gray}{\texttt{#1}}}
+
+% When cleveref fails to do its job
+%\newcommand{\apref}[1]{Appendix \ref{#1}}
+
+\begin{document}
+%*Corresponding author: Kirill M. Gerke, Tel.: +79661877715, E-mail: kg@ifz.ru,
+%Address: Schmidt Institute of Physics of the Earth of Russian Academy of
+%Sciences, Bolshaya Gruzinskaya str. 10/1, Moscow, 123242, Russia
+\author{Vasily Postnicov}
+\affiliation{Schmidt Institute of Physics of the Earth of Russian Academy of
+  Sciences, Moscow, 123242, Russia}
+\author{Alexey I. Samarin}
+\altaffiliation{Computational Mathematics and Cybernetics, Lomonosov Moscow
+  State University, Moscow, 119991, Russia}
+\affiliation{Schmidt Institute of Physics of the Earth of Russian Academy of
+  Sciences, Moscow, 123242, Russia}
+\author{Efim V. Lavrukhin}
+\altaffiliation{Computational Mathematics and Cybernetics, Lomonosov Moscow
+  State University, Moscow, 119991, Russia}
+\affiliation{Schmidt Institute of Physics of the Earth of Russian Academy of
+  Sciences, Moscow, 123242, Russia}
+\author{Marina V. Karsanina}
+\affiliation{Schmidt Institute of Physics of the Earth of Russian Academy of
+  Sciences, Moscow, 123242, Russia}
+\author{Mathieu Gravey}
+\altaffiliation{University of Lausanne, Faculty of Geosciences and Environment,
+  Institute of Earth Surface Dynamics, Lausanne, Switzerland}
+\author{Kirill M. Gerke}
+\email[E-mail:]{kg@ifz.ru}
+\affiliation{Schmidt Institute of Physics of the Earth of Russian Academy of
+  Sciences, Moscow, 123242, Russia}
+
+\title{Cool simulated annealing package}
+
+\begin{abstract}
+  What have we done?
+\end{abstract}
+
+\maketitle
+
+\section{Overview of simulated annealing algorithm}
+\label{sec:annealing}
+The goal of our work is to create a two or three dimensional binary image $A$
+which minimizes some non-negative target function $f(A, B)$. This function
+usually includes difference in correlation functions, such as two-point or
+lineal-path correlation function, between the image $A$ and the target (or
+original) image $B$. The image $B$ is not necessarily known but can instead be
+described by a set of correlation functions. The algorithm which minimizes the
+target function is an iterative algorithm called \textit{simulated
+  annealing}. The principle of work is following:
+\begin{enumerate}
+\item Take $A$ as an inititial approximation of $B$.
+\item Let $T_0$ be a real-valued parameter called \textit{temperature}.
+\item Let $f_1 = f(A, B)$
+\item Let $S$ be any number of samples taken from $A$ (indices into $A$) using
+  a sample function $s(A)$.
+\item Modify samples $S$ using a modification function $m$ and assign the result
+  to $S'$: $S' = m(S)$. Create a new image $A'$ by replacing samples $S$ with
+  $S'$.
+\item Let $f_2 = f(A', B)$.
+\item For k-th iteration of the simulated annealing replace $A$ with $A'$ with
+  probability
+  \begin{equation*}
+    p =
+    \begin{cases}
+      1 & \text{if } f_2 < f_1 \\
+      \exp(-\frac{f_2 - f_1}{T_k}) & \text{otherwise}
+    \end{cases}
+  \end{equation*}
+  otherwise just discard $A'$.
+\item Assign a new value $c(T_k, f_2)$ to $T_{k+1}$.
+\item Repeat from the third step until some requirements are met, e.g.
+  $f(A, B) < \epsilon$.
+\end{enumerate}
+This algorithm requires a selection of five parameters: a value $T_0$, a target
+function $f(A, B)$, a sampler function $s(A)$, a modifier function $m(S)$ and a
+function $c(T, f)$, called \textit{cooldown schedule}. Also we need to define a
+way in which an initial approximation is obtained. This results in six
+configurable options which can be tuned in order to obtain the best result. A
+process of generating an initial approximation is discussed in section
+\cref{sec:init}, possible target functions are discussed in \cref{sec:target},
+sampler and modifier functions are discussed in \cref{sec:samplers-mods} and
+cooldown schedules are discussed in \cref{sec:cooldown}.
+
+\section{Initial approximations}
+\label{sec:init}
+In this section we discuss how initial images for the first part of simulated
+annealing algorithm can be created.
+\subsection{Using uniformly distributed noise}
+\label{sec:init-uniform}
+\textbf{FIXME: Is this noise really ``uniformly distributed''?}
+To approximate a binary image $B$ we create an image $A$ consisting entirely of
+void phase. Then we change a randomly selected sample in $A$ to be in solid
+phase. The sample is taken according to a uniform distribution. We then repeat
+this process, independently taking and changing another sample until porosity of
+the image $A$ equals to porosity of the image $B$. In this case we start the
+algorithm with $S_2(A, 0) = S_2(B, 0) = L_2(A, 0) = L_2(B, 0)$ where $S_2$ is
+the two-point correlation function and $L_2$ is the lineal-path correlation
+function.
+\subsection{Using overlapped balls}
+\label{sec:init-balls}
+As described in \cite{Torq-book}, analytic representation of $S_2$ and $L_2$
+functions is well known for overlapping balls of radius $R$ with centers
+generated by Poisson point process with a parameter $\lambda$. An expression for
+$S_2$ function is following:
+\begin{equation}
+  S_2(r, R, \lambda) = \exp(-\lambda v_1(R) v_2(r, R)) \label{eq:s2-balls}
+\end{equation}
+where $v_1(R)$ is a volume of n-dimensional ball and
+\begin{equation*}
+  v_2(r, R) =
+  \begin{cases}
+    2H(r - 2R) + \frac{2}{\pi}[\pi + \frac{r}{2R}(1 - \frac{r^2}{4R^2})^{1/2} -
+      \arccos(\frac{r}{2R})]H(2R-r) & n = 2 \\
+    2H(r - 2R) + [1 + \frac{3}{4}\frac{r}{R} - \frac{1}{16}(\frac{r}{R})^3]H(2R
+    - r) & n = 3
+  \end{cases}
+\end{equation*}
+where $H(x)$ is Heaviside step-function.
+
+The method of making an initial approximation is as follows:
+\begin{enumerate}
+\item Calculate two-point correlation function $S_2(B)$ of the original image
+  $B$.
+\item Find parameters $R, \lambda$ so that \cref{eq:s2-balls} fits
+  $S_2(B)$. This can be done using well-known least-squares method.
+\item Generate a set of centers $C$ using a realization of Poisson point process
+  with parameter $\lambda$.
+\item Draw balls of radius $R$ with centers in $C$.
+\end{enumerate}
+This method results in faster convergence of simulated annealing algorithm when
+the target function takes $S_2$ into account. For good results it is neccessary
+for number of generated centers to be big enough. Note that for this method
+$S_2(A, 0) \ne S_2(B, 0)$ and $L_2(A, 0) \ne L_2(B, 0)$.
+\begin{figure}[ht]
+  \centering
+  \subfigure[Target image]{
+    \includegraphics[width=0.45\linewidth]{../images/balls-orig.png}
+    \label{fig:init-balls-target}}
+  \hfill
+  \subfigure[Initial approximation]{
+    \includegraphics[width=0.45\linewidth]{../images/balls-init.png}
+    \label{fig:init-balls-init}}
+  \caption[]{An example of a target image and an initial approximation by
+    overlapping balls.}
+  \label{fig:init-balls}
+\end{figure}
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\linewidth]{../corrfns-plots/init-s2.png}
+  \caption[]{Two-point correlation function for the target image and the initial
+  approximation show on \cref{fig:init-balls}.}
+  \label{fig:init-balls-s2}
+\end{figure}
+
+\section{Target functions}
+\label{sec:target}
+\subsection{Capek target function}
+\label{sec:capek}
+sfdf
+\subsection{Generalized Capek target function}
+\label{sec:capek-general}
+fdfdokg
+
+\section{Samplers and modifiers}
+\label{sec:samplers-mods}
+In this section we discuss sampler functions $s(A)$ along with modifier
+functions $m(S)$. A composed function $m \circ s$ is a function which modifies
+the image $A$ and produces a new image $A'$ at each step of the simulated
+annealing algorithm. 
+\subsection{Uniform sampler}
+\label{sec:sampler-uniform}
+This sampler is the most simple one. It takes a sample according to a uniform
+distribution. Usually, the use of this sampler results in very slow decrease of
+the target function, so we use more advanced samplers like ones described in
+\cref{sec:sampler-dpn} or \cref{sec:sampler-interface} whenever possible.
+
+\subsection{Improved random sampler}
+\label{sec:sampler-dpn}
+ddfd
+
+\subsection{Sampling on the phase interface}
+\label{sec:sampler-interface}
+This sampler generates a random starting index $S_0$ in $A$ and a vector
+$\delta: |\delta| = 1$. Then it finds minimal positive $n$ so that
+$A(s_0) \ne A(s_0 + n\delta)$. An index $s_0 + \lfloor n\delta \rfloor$ is a new
+sample. The point is that all samples generated this way belong to an interface
+between phases.
+
+\subsection{Flipper modifier}
+\label{sec:flipper}
+This modifier function is used to reconstruct binary images. Binary image is
+an image which contains only elements $v$ and $s$ (\textit{void} or
+\textit{solid} respectively). Flipper modifier takes one sample and ``flips''
+the phase of that sample, changing $v$ to $s$ and vice-versa.
+
+\subsection{Swapper modifier}
+\label{sec:swapper}
+The Swapper modifier function takes a pair of samples $(s_1, s_2)$ with
+$A(s_1) \ne A(s_2)$ and ``swaps'' the phases of these samples
+($A(s_1) \rightarrow A(s_2), A(s_2) \rightarrow A(s_1)$). This modifier function
+preserves porosity of two-phase images, so it is unsuitable for use with
+initialization algorithm described in \cref{sec:init-balls}.
+
+\section{Cooldown schedules}
+\label{sec:cooldown}
+\subsection{Exponential cooldown schedule}
+\label{sec:cooldown-exp}
+Exponential cooldown is the simplest cooldown schedule. It depends on parameters
+$n \in \mathbb{N}$ and $\lambda \in \mathbb{R}$. For k-th step of the simulated
+annealing a new value of temperature is calculated as
+\begin{equation*}
+  T_{k+1} =
+  \begin{cases}
+    T_k, & k \ne ln, l \in \mathbb{N} \\
+    \lambda T_k, & \text{otherwise}
+  \end{cases}
+\end{equation*}
+
+\subsection{Aarts-Korst cooldown schedule}
+\label{sec:cooldown-aarts-korst}
+Aarts-Korst cooldown schedule \cite{Aarts-Korst} also depends on parameters
+$n \in \mathbb{N}$ and $\lambda \in \mathbb{R}$. The temperature is updated on
+each n-th step as in \cref{sec:cooldown-exp}, but this time instead of simply
+multiplying $T$ on constant parameter $\lambda$ we define a new value of
+temperature as
+\begin{equation*}
+  \frac{1}{T_{kn+1}} = \frac{1}{T_{kn}} + \frac{\lambda}{\sigma_{kn}}
+\end{equation*}
+where $\sigma_{kn}$ is standard deviation of values of target function on steps
+$(k-1)n, \dots, kn$.
+
+\subsection{Frost-Heinemann cooldown schedule}
+\label{sec:cooldown-frost-heinemann}
+dsdsd
+
+\section{Results}
+In this section we provide reconstructions of some two-dimensional images
+including a checkerboard, randomly generated overlapping monodisperse disks,
+rotated and thresholded value noise and a sandstone. The images are
+reconstructed using two sets of correlation functions:
+\begin{enumerate}
+\item Two-point correlation function $S_2(r)$ and lineal-path correlation
+  functions for solid $L_2^{(1)}(r)$ and void $L_2^{(0)}(r)$ phases.
+\item Functions from the first set plus surface-surface correlation function
+  $F_{ss}(r)$ and surface-void correlation function $F_{sv}(r)$.
+\end{enumerate}
+These correlation functions are calculated in two axial and two diagonal
+directions.
+
+All images are reconstructed using a cooldown schedule proposed by Aarts and
+Korst \cite{Aarts-Korst} with parameters $n = 200$ and $\lambda = 0.007$ in 9
+million iterations. For each reconstructed image we provide a plot of difference
+between correlation functions of the original and reconstructed images as a
+function of correlation length (averaged over all directions) as well as an
+image showing difference between two-point correlation maps.
+
+When the first set of correlation functions is chosen for a reconstruction, we
+use a target function described in \cref{sec:capek}, otherwise, a function
+described in \cref{sec:capek-general} is used. A modifier used in all
+reconstruction is described in \cref{sec:flipper}.
+
+\subsection{Checkerboard}
+The original image has dimensions 500x500 pixels with dimensions of a single
+square being 32x32 pixels. Uniformly distributed(?) noise was picked as an
+initial approximation of the original. The sampler used in the reconstruction is
+described in \cref{sec:sampler-dpn}. The original and reconstructed images can
+be seen on \cref{fig:check-orig} -- \cref{fig:check-all}. The difference between
+reconstructed and original correlation functions is on
+\cref{fig:check-corr-s2l2} -- \cref{fig:check-corr-all}. As you can see,
+addition of surface-surface or surface-void correlation functions to the target
+function does not improve the result much in this particular case.
+
+\subsection{Overlapping disks}
+The original image of overlapping monodisperse disks has dimensions 500x500
+pixels. All parameters are chosen to be the same as for the case with
+checkerboard. The original and reconstructed images can be seen on
+\cref{fig:disks-orig} -- \cref{fig:disks-all}. The difference between
+reconstructed and original correlation functions is on
+\cref{fig:disks-corr-s2l2} -- \cref{fig:disks-corr-all}.
+
+\subsection{Value noise}
+The original image has dimensions 1000x1000 pixels and was produced by
+generating two dimensional value noise with \verb+ValueNoise.jl+ package,
+thresholding and rotating it on $-\pi/4$ radians. A set of overlapping spheres
+was used as an initial approximation of the original images, and the sampler
+used in reconstruction procedure is described in \cref{sec:sampler-interface}.
+
+\begin{figure*}[htp]
+  \centering
+  \subfigure[Checkerboard]{
+    \includegraphics[width=0.3\textwidth]{../images/checkboard-orig.png}
+    \label{fig:check-orig}}
+  \hfill
+  \subfigure[Reconstruction of \cref{fig:check-orig} using set 1]{
+    \includegraphics[width=0.3\textwidth]{../images/checkboard-s2l2.png}
+    \label{fig:check-s2l2}}
+  \hfill
+  \subfigure[Reconstruction of \cref{fig:check-orig} using set 2]{
+    \includegraphics[width=0.3\textwidth]{../images/checkboard-all.png}
+    \label{fig:check-all}}
+  \vskip\baselineskip
+  \subfigure[Small overlapping disks]{
+    \includegraphics[width=0.3\textwidth]{../images/disks-orig.png}
+    \label{fig:disks-orig}}
+  \hfill
+  \subfigure[Reconstruction of \cref{fig:disks-orig} using set 1]{
+    \includegraphics[width=0.3\textwidth]{../images/disks-s2l2.png}
+    \label{fig:disks-s2l2}}
+  \hfill
+  \subfigure[Reconstruction of \cref{fig:disks-orig} using set 2]{
+    \includegraphics[width=0.3\textwidth]{../images/disks-all.png}
+    \label{fig:disks-all}}
+  \caption[]{Original images and their reconstructions}
+  \label{fig:orig-recon1}
+\end{figure*}
+
+\begin{figure*}[htp]
+  \centering
+  \subfigure[Value noise]{
+    \includegraphics[width=0.3\textwidth]{../images/noise-orig.png}
+    \label{fig:noise-orig}}
+  \hfill
+  \subfigure[Reconstruction of \cref{fig:noise-orig} using set 1]{
+    \includegraphics[width=0.3\textwidth]{../images/noise-s2l2.png}
+    \label{fig:noise-s2l2}}
+  \hfill
+  \subfigure[Reconstruction of \cref{fig:noise-orig} using set 2]{
+    \includegraphics[width=0.3\textwidth]{../images/noise-all.png}
+    \label{fig:noise-all}}
+  \vskip\baselineskip
+  \subfigure[Sandstone]{
+    \includegraphics[width=0.3\textwidth]{../images/sandstone-orig.png}
+    \label{fig:sandstone-orig}}
+  \hfill
+  \subfigure[Reconstruction of \cref{fig:sandstone-orig} using set 1]{
+    \includegraphics[width=0.3\textwidth]{../images/sandstone-s2l2.png}
+    \label{fig:sandstone-s2l2}}
+  \hfill
+  \subfigure[Reconstruction of \cref{fig:sandstone-orig} using set 2]{
+    \includegraphics[width=0.3\textwidth]{../images/sandstone-all.png}
+    \label{fig:sandstone-all}}
+  \caption[]{Original images and their reconstructions (continued)}
+  \label{fig:orig-recon2}
+\end{figure*}
+
+\begin{figure*}[htp]
+  \centering
+  \subfigure[]{
+    \includegraphics[width=0.3\textwidth]{../corrfns-plots/checkboard-s2l2.png}
+    \label{fig:check-corr-s2l2}}
+  \hfill
+  \subfigure[]{
+    \includegraphics[width=0.3\textwidth]{../corrfns-plots/checkboard-s2l2-map.png}
+    \label{fig:check-corr-map}}
+  \hfill
+  \subfigure[]{
+    \includegraphics[width=0.3\textwidth]{../corrfns-plots/checkboard-all.png}
+    \label{fig:check-corr-all}}
+  \vskip\baselineskip
+  \subfigure[]{
+    \includegraphics[width=0.3\textwidth]{../corrfns-plots/disks-s2l2.png}
+    \label{fig:disks-corr-s2l2}}
+  \hfill
+  \subfigure[]{
+    \includegraphics[width=0.3\textwidth]{../corrfns-plots/disks-s2l2-map.png}
+    \label{fig:disks-corr-map}}
+  \hfill
+  \subfigure[]{
+    \includegraphics[width=0.3\textwidth]{../corrfns-plots/disks-all.png}
+    \label{fig:disks-corr-all}}
+  \caption[]{Difference between correlation functions of the original and
+    reconstructed images. From \cref{fig:check-corr-s2l2} to
+    \cref{fig:check-corr-all} — checkerboard, from \cref{fig:disks-corr-s2l2} to
+    \cref{fig:disks-corr-all} — overlapping disks. Images to the left are
+    for reconstructions using correlation functions from the first set, images
+    to the right are for reconstructions using functions from the second
+    set. Images in the center are differences between two-point correlation maps
+    of the original and reconstructed images.}
+  \label{fig:corrfn-diff1}
+\end{figure*}
+
+\begin{figure*}[htp]
+  \centering
+  \subfigure[]{
+    \includegraphics[width=0.3\textwidth]{../corrfns-plots/noise-s2l2.png}
+    \label{fig:noise-corr-s2l2}}
+  \hfill
+  \subfigure[]{
+    \includegraphics[width=0.3\textwidth]{../corrfns-plots/noise-s2l2-map.png}
+    \label{fig:noise-corr-map}}
+  \hfill
+  \subfigure[]{
+    \includegraphics[width=0.3\textwidth]{../corrfns-plots/noise-all.png}
+    \label{fig:noise-corr-all}}
+  \vskip\baselineskip
+  \subfigure[]{
+    \includegraphics[width=0.3\textwidth]{../corrfns-plots/sandstone-s2l2.png}
+    \label{fig:sandstone-corr-s2l2}}
+  \hfill
+  \subfigure[]{
+    \includegraphics[width=0.3\textwidth]{../corrfns-plots/sandstone-s2l2-map.png}
+    \label{fig:sandstone-corr-map}}
+  \hfill
+  \subfigure[]{
+    \includegraphics[width=0.3\textwidth]{../corrfns-plots/sandstone-all.png}
+    \label{fig:sandstone-corr-all}}
+  \caption[]{Difference between correlation functions of the original and
+    reconstructed images (continued). From \cref{fig:noise-corr-s2l2} to
+    \cref{fig:noise-corr-all} — value noise, from \cref{fig:sandstone-corr-s2l2}
+    to \cref{fig:sandstone-corr-all} — sandstone. Images to the left are
+    for reconstructions using correlation functions from the first set, images
+    to the right are for reconstructions using functions from the second
+    set. Images in the center are differences between two-point correlation maps
+    of the original and reconstructed images.}
+  \label{fig:corrfn-diff2}
+\end{figure*}
+
+
+%\onecolumngrid
+%\bibliography{habib}
+%\bibliographystyle{plain}
+%\twocolumngrid
+
+\end{document}
