@@ -11,19 +11,19 @@ jobs:
       - name: Compile LaTeX document (stage 1)
         uses: dante-ev/latex-action@latest
         with:
-          root_file: paper-correlations.tex
+          root_file: annealing.tex
           working_directory: paper
       - name: Run bibtex
         uses: dante-ev/latex-action@latest
         with:
-          root_file: paper-correlations.aux
+          root_file: annealing.aux
           compiler: bibtex
           args:
           working_directory: paper
       - name: Compile LaTeX document (stage 2)
         uses: dante-ev/latex-action@latest
         with:
-          root_file: paper-correlations.tex
+          root_file: annealing.tex
           working_directory: paper
       - name: Upload
         uses: svenstaro/upload-release-action@v2
