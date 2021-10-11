@@ -1,0 +1,36 @@
+name: Compile and upload
+
+on: push
+
+jobs:
+  compile_upload:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Compile LaTeX document (stage 1)
+        uses: dante-ev/latex-action@latest
+        with:
+          root_file: annealing.tex
+          working_directory: paper
+      - name: Run bibtex
+        uses: dante-ev/latex-action@latest
+        with:
+          root_file: annealing.aux
+          compiler: bibtex
+          args:
+          working_directory: paper
+      - name: Compile LaTeX document (stage 2)
+        uses: dante-ev/latex-action@latest
+        with:
+          root_file: annealing.tex
+          working_directory: paper
+      - name: Upload
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: paper/annealing.pdf
+          asset_name: annealing.pdf
+          tag: ${{ github.ref }}
+          overwrite: true
+          body: "Paper draft"
