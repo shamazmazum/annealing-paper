@@ -176,12 +176,59 @@ $S_2(A, 0) \ne S_2(B, 0)$ and $L_2(A, 0) \ne L_2(B, 0)$.
 
 \section{Target functions}
 \label{sec:target}
+In this section we discuss target functions used in our package. At first we
+define difference between images $A$ and $B$ measured with respect to
+correlation function $cf$ as
+\begin{equation*}
+  \Delta_{cf}(A, B) = \sum_{n=0}^{N} \sum_{i} (F_c(A, n\mathbf{x}_i) - F_c(B, n\mathbf{x}_i))^2
+\end{equation*}
+Here $n$ is a correlation length and $\mathbf{x}_i$ is a direction at which
+correlation function is calculated. We can calculate correlation functions along
+axial directions (e.g. $(1,0,0)$, $(0, 1, 0)$ and $(0, 0, 1)$ for 3D images) and
+diagonal directions which results in total of 4 directions for 2D images and 13
+directions for 3D images.
+
+At each step of simulated annealing algorithm we can fastly update $S_2$ and
+$L_2$ functions and also $F_{ss}$ (surface-surface) and $F_{sv}$ (surface-void)
+functions, so these four functions are usually taken into account.
+
+\subsection{Weighted target function}
+\label{sec:target-weighted}
+Weighted target function defined as
+\begin{equation*}
+  f_w(A, B) = \sum_{n=1}^{N} \frac{\Delta_{f_n}(A, B)}{\Delta_{{f_n}0}}
+\end{equation*}
+where $\Delta_{{f_n}0} = \Delta_{f_n}(A, B)$ before any modifications are made
+to $A$. The initial value of $f_w(A, B)$ is $N$. Any number $N$ of correlation
+functions may participate in this target function.
+
 \subsection{Capek target function}
-\label{sec:capek}
-sfdf
+\label{sec:target-capek}
+The original target function proposed by Capek \cite{Capek-target} is
+\begin{align*}
+  f_c(A, B) = e_1 & + e_2 + e_3 \frac{\eta}{\eta + e_1 + e_2} \\
+  e_1 & = \Delta_{S^{(void)}_2}(A, B) \\
+  e_2 & = \Delta_{L^{(solid)}_2}(A, B) \\
+  e_3 & = \Delta_{L^{(void)}_2}(A, B)
+\end{align*}
+The parameter $\eta$ is usually set to $0.3-0.5$. In this function influence of
+$L_2^{(void)}$ increases with decrease of the target function.
+
 \subsection{Generalized Capek target function}
-\label{sec:capek-general}
-fdfdokg
+\label{sec:target-capek-general}
+This target function is a generalization of the function described in
+\cref{sec:target-capek} for use with surface-surface and surface-void
+functions. It is defined as
+\begin{align*}
+  f_{gc}(A, B) = e_1 + e_2 + e_3 \frac{\eta_1}{\eta_1 + e_1 + e_2} & + e_4
+  \frac{\eta_2}{\eta_2 + e_1 + e_2} + e_5 \frac{\eta_2}{\eta_2 + e_1 + e_2} \\
+  e_1(A, B) & = \Delta_{S^{(void)}_2}(A, B) \\
+  e_2(A, B) & = \Delta_{L^{(solid)}_2}(A, B) \\
+  e_3(A, B) & = \Delta_{L^{(void)}_2}(A, B) \\
+  e_4(A, B) & = \Delta_{F^{(void)}_{ss}}(A, B) \\
+  e_5(A, B) & = \Delta_{F^{(void)}_{sv}}(A, B)
+\end{align*}
+where $\eta_1$ and $\eta_2$ are two parameters in the range $0.3-0.5$.
 
 \section{Samplers and modifiers}
 \label{sec:samplers-mods}
@@ -196,9 +243,16 @@ distribution. Usually, the use of this sampler results in very slow decrease of
 the target function, so we use more advanced samplers like ones described in
 \cref{sec:sampler-dpn} or \cref{sec:sampler-interface} whenever possible.
 
-\subsection{Improved random sampler}
+\subsection{Different phase neighbors-based sampler}
 \label{sec:sampler-dpn}
-ddfd
+Motivation behind this sampler is simple: we take a sample $s_c$ from an image
+and look at its neighbors. If a number of neighbors which have a phase different
+from a phase of $s_c$ is high when probably this sample is ``lost'' in a region
+of alien phase and is subject for modification. The goal is to create regions of
+(locally) the same phase and more ``smooth'' image.
+
+A probability of taking any fixed sample $s_c$ with a uniform sampler described
+in \cref{sec:sampler-uniform} is...
 
 \subsection{Sampling on the phase interface}
 \label{sec:sampler-interface}
@@ -225,11 +279,20 @@ initialization algorithm described in \cref{sec:init-balls}.
 
 \section{Cooldown schedules}
 \label{sec:cooldown}
+We use three well-known cooldown schedules, namely, exponential cooldown,
+Aarts-Korst schedule \cite{Aarts-Korst }and Frost-Heinemann
+\cite{Frost-Heinemann} schedule. All these schedules depend on two parameters:
+$n \in \mathbb{N}$ and $\lambda \in \mathbb{R}$. In all the schedules $n$ is
+choosen big enough to achieve thermodynamic equilibrium before the temperature
+decreases. Thermodynamic equilibrium is a state when a number of accepted
+changes is roughly equal to a number of rejected changes when the most recent
+changes are taken into consideration. $\lambda$ must be in the range $0.85-0.95$
+for the exponential cooldown and $0.001-1.0$ for other schedules.
+
 \subsection{Exponential cooldown schedule}
 \label{sec:cooldown-exp}
-Exponential cooldown is the simplest cooldown schedule. It depends on parameters
-$n \in \mathbb{N}$ and $\lambda \in \mathbb{R}$. For k-th step of the simulated
-annealing a new value of temperature is calculated as
+Exponential cooldown is the simplest cooldown schedule. For k-th step of the
+simulated annealing a new value of temperature is calculated as
 \begin{equation*}
   T_{k+1} =
   \begin{cases}
@@ -240,20 +303,28 @@ annealing a new value of temperature is calculated as
 
 \subsection{Aarts-Korst cooldown schedule}
 \label{sec:cooldown-aarts-korst}
-Aarts-Korst cooldown schedule \cite{Aarts-Korst} also depends on parameters
-$n \in \mathbb{N}$ and $\lambda \in \mathbb{R}$. The temperature is updated on
-each n-th step as in \cref{sec:cooldown-exp}, but this time instead of simply
-multiplying $T$ on constant parameter $\lambda$ we define a new value of
-temperature as
+In this schedule the temperature is updated on each n-th step as in
+\cref{sec:cooldown-exp}, but this time instead of simply multiplying $T$ on
+constant parameter $\lambda$ we define a new value of temperature as
 \begin{equation*}
-  \frac{1}{T_{kn+1}} = \frac{1}{T_{kn}} + \frac{\lambda}{\sigma_{kn}}
+  \frac{1}{T_{l+1}} = \frac{1}{T_l} + \frac{\lambda}{\sigma_l}
 \end{equation*}
-where $\sigma_{kn}$ is standard deviation of values of target function on steps
-$(k-1)n, \dots, kn$.
+where $l \in \mathbb{N}$ is a multiple of $n$ and $\sigma_{l}$ is standard
+deviation of values of target function on steps $l-n, \dots, l$.
 
 \subsection{Frost-Heinemann cooldown schedule}
 \label{sec:cooldown-frost-heinemann}
-dsdsd
+As in two previous schedules the temperature updates every n-th step. Also there
+is an auxiliary value $\hat{E}_l$ called \textit{target mean energy} which also
+updates every n-th step. New values for temperature and target mean energy are
+calculated as
+\begin{align*}
+  \hat{E}_{l+1} & = \overline{E}_l - \lambda \sigma_l \\
+  T_{l+1} & = T_l + (\hat{E}_{l+1} - \hat{E}_l)\frac{T^2_l}{\sigma^2_l}
+\end{align*}
+where $\overline{E}_l$ is mean value of target function calculated for
+steps $l-n,\dots,n$ and $\sigma_l$ is standard deviation of values of
+target function for the same range of steps and $\hat{E}_0 = \overline{E}_0$.
 
 \section{Results}
 In this section we provide reconstructions of some two-dimensional images
@@ -277,9 +348,9 @@ function of correlation length (averaged over all directions) as well as an
 image showing difference between two-point correlation maps.
 
 When the first set of correlation functions is chosen for a reconstruction, we
-use a target function described in \cref{sec:capek}, otherwise, a function
-described in \cref{sec:capek-general} is used. A modifier used in all
-reconstruction is described in \cref{sec:flipper}.
+use a target function described in \cref{sec:target-capek}, otherwise, a
+function described in \cref{sec:target-capek-general} is used. A modifier used
+in all reconstruction is described in \cref{sec:flipper}.
 
 \subsection{Checkerboard}
 The original image has dimensions 500x500 pixels with dimensions of a single
