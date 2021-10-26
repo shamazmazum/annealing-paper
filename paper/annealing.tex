@@ -252,7 +252,46 @@ of alien phase and is subject for modification. The goal is to create regions of
 (locally) the same phase and more ``smooth'' image.
 
 A probability of taking any fixed sample $s_c$ with a uniform sampler described
-in \cref{sec:sampler-uniform} is...
+in \cref{sec:sampler-uniform} is $P = \frac{1}{N}$ where $N$ is a total number
+of pixels or voxels in the image. Now suppose that the set $S$ of all samples of
+the image is divides into $n$ disjoints sets $S_i$:
+\begin{align*}
+  S &= \bigcup_{i=0}^{n-1} S_i \\
+  S_i \cap S_j &= \varnothing \quad \text{for } \forall i,j: i \ne j
+\end{align*}
+
+Now suppose $A$ is an event of choosing any fixed sample $s_c$ and $B_i$ is an
+event of choosing a sample from the set $S_i$. The probability of choosing the
+sample $s_c$ equals to
+\begin{equation*}
+  P(A) = \sum_{i = 0}^{n-1} P(A|B_i) P(B_i) = \frac{1}{N}
+\end{equation*}
+where $P(B_i) = \frac{N_i}{N}$ and $P(A|B_i) = \frac{1}{N_i}$ if $s_c \in S_i$
+and zero otherwise. $N_i$ is these equations means a number of samples in the
+set $S_i$.
+
+The sampling method described in \cref{sec:sampler-uniform} is equivalent to
+these two steps:
+\begin{enumerate}
+\item Choose a set $S_i$ with probability $\frac{N_i}{N}$.
+\item Uniformly choose a sample in this set.
+\end{enumerate}
+We can put an emphasis on sets with bigger value of $i$, so the probability of
+choosing a set $S_i$ becomes
+\begin{equation}
+  P(B_i) = \alpha^i \beta \frac{N_i}{N} \quad \text{for } \alpha > 1 \label{eq:prob-dpn}
+\end{equation}
+where $\beta$ can be found from an equation
+\begin{equation*}
+  \beta (\sum_{i=0}^{n-1} \alpha^i \frac{N_i}{N}) = 1
+\end{equation*}
+
+The disjoint sets $S_i$ are chosen by analizing the number of different phase
+neighbors for each voxel or pixel. A sample $x$ belongs to the set $S_i$ if a
+set $\left\{ x_j: \rho(x, x_j) = 1 \land A(x_j) \ne A(x) \right\}$  contains $i$
+elements. Here $\rho(x,y)$ denotes the Chebyshev distance. The sampling
+algorithm consists of the previosly described two steps with the probability
+$\frac{N_i}{N}$ replaced by \cref{eq:prob-dpn}.
 
 \subsection{Sampling on the phase interface}
 \label{sec:sampler-interface}
