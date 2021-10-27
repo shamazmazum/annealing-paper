@@ -1,4 +1,12 @@
-\documentclass[preprint,amsmath,amssymb,aps,pre]{revtex4-1}
+\documentclass[preprint,amsmath,amssymb,aps,pre,nofootinbib]{revtex4-1}
+
+\usepackage{hyperref}
+\usepackage{bm}
+\usepackage{cleveref}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{subfigure}
+
 % Latex
 \usepackage[english]{babel}
 \usepackage[utf8]{inputenc}
@@ -10,11 +18,6 @@
 %\setmainfont{DejaVu Sans}
 %\setsansfont{DejaVu Sans}
 %\setmonofont{DejaVu Sans Mono}
-\usepackage{bm}
-\usepackage{cleveref}
-\usepackage{graphicx}
-\usepackage{xcolor}
-\usepackage{subfigure}
 
 \definecolor{light-gray}{gray}{0.95}
 \newcommand{\code}[1]{\colorbox{light-gray}{\texttt{#1}}}
@@ -72,11 +75,12 @@ target function is an iterative algorithm called \textit{simulated
 \item Take $A$ as an inititial approximation of $B$.
 \item Let $T_0$ be a real-valued parameter called \textit{temperature}.
 \item Let $f_1 = f(A, B)$
-\item Let $S$ be any number of samples taken from $A$ (indices into $A$) using
-  a sample function $s(A)$.
-\item Modify samples $S$ using a modification function $m$ and assign the result
-  to $S'$: $S' = m(S)$. Create a new image $A'$ by replacing samples $S$ with
-  $S'$.
+\item Let $S$ be any number of samples taken from $A$ using a sample function
+  $s(A)$. A sample is a pair $(x, A(x))$ where $x$ is an index into $A$.
+\item Modify all samples in $S$ by changing the second value in the pair
+  $(x, A(x))$ using a modification function $m$ and assign the result to $S'$:
+  $S' = m(S)$. Create a new image $A'$ by replacing samples in $S$ with
+  corresponding samples in $S'$.
 \item Let $f_2 = f(A', B)$.
 \item For k-th iteration of the simulated annealing replace $A$ with $A'$ with
   probability
@@ -97,14 +101,15 @@ function $f(A, B)$, a sampler function $s(A)$, a modifier function $m(S)$ and a
 function $c(T, f)$, called \textit{cooldown schedule}. Also we need to define a
 way in which an initial approximation is obtained. This results in six
 configurable options which can be tuned in order to obtain the best result. A
-process of generating an initial approximation is discussed in section
-\cref{sec:init}, possible target functions are discussed in \cref{sec:target},
-sampler and modifier functions are discussed in \cref{sec:samplers-mods} and
-cooldown schedules are discussed in \cref{sec:cooldown}.
+process of generating an initial approximation is discussed in \cref{sec:init},
+possible target functions are discussed in \cref{sec:target}, sampler and
+modifier functions are discussed in \cref{sec:samplers-mods} and cooldown
+schedules are discussed in \cref{sec:cooldown}. Our implementation of algorithms
+discussed in this paper is briefly described in \cref{sec:julia-code}.
 
 \section{Initial approximations}
 \label{sec:init}
-In this section we discuss how initial images for the first part of simulated
+In this section we discuss how initial images for the first step of simulated
 annealing algorithm can be created.
 \subsection{Using uniformly distributed noise}
 \label{sec:init-uniform}
@@ -149,9 +154,9 @@ The method of making an initial approximation is as follows:
 \item Draw balls of radius $R$ with centers in $C$.
 \end{enumerate}
 This method results in faster convergence of simulated annealing algorithm when
-the target function takes $S_2$ into account. For good results it is neccessary
-for number of generated centers to be big enough. Note that for this method
-$S_2(A, 0) \ne S_2(B, 0)$ and $L_2(A, 0) \ne L_2(B, 0)$.
+the target function is taken $S_2$ into account. For good results it is
+neccessary for number of generated centers to be big enough. Note that for this
+method $S_2(A, 0) \ne S_2(B, 0)$ and $L_2(A, 0) \ne L_2(B, 0)$.
 \begin{figure}[ht]
   \centering
   \subfigure[Target image]{
@@ -178,9 +183,9 @@ $S_2(A, 0) \ne S_2(B, 0)$ and $L_2(A, 0) \ne L_2(B, 0)$.
 \label{sec:target}
 In this section we discuss target functions used in our package. At first we
 define difference between images $A$ and $B$ measured with respect to
-correlation function $cf$ as
+correlation function $F_c$ as
 \begin{equation*}
-  \Delta_{cf}(A, B) = \sum_{n=0}^{N} \sum_{i} (F_c(A, n\mathbf{x}_i) - F_c(B, n\mathbf{x}_i))^2
+  \Delta_{F_{c}}(A, B) = \sum_{n=0}^{N} \sum_{i} (F_c(A, n\mathbf{x}_i) - F_c(B, n\mathbf{x}_i))^2
 \end{equation*}
 Here $n$ is a correlation length and $\mathbf{x}_i$ is a direction at which
 correlation function is calculated. We can calculate correlation functions along
@@ -194,7 +199,7 @@ functions, so these four functions are usually taken into account.
 
 \subsection{Weighted target function}
 \label{sec:target-weighted}
-Weighted target function \cite{gerke-target} defined as
+Weighted target function \cite{gerke-target} is defined as
 \begin{equation*}
   f_w(A, B) = \sum_{n=1}^{N} \frac{\Delta_{f_n}(A, B)}{\Delta_{{f_n}0}}
 \end{equation*}
@@ -243,13 +248,14 @@ distribution. Usually, the use of this sampler results in very slow decrease of
 the target function, so we use more advanced samplers like ones described in
 \cref{sec:sampler-dpn} or \cref{sec:sampler-interface} whenever possible.
 
-\subsection{Different phase neighbors-based sampler}
+\subsection{Different phase neighbors sampler}
 \label{sec:sampler-dpn}
-Motivation behind this sampler is simple: we take a sample $s_c$ from an image
-and look at its neighbors. If a number of neighbors which have a phase different
-from a phase of $s_c$ is high when probably this sample is ``lost'' in a region
-of alien phase and is subject for modification. The goal is to create regions of
-(locally) the same phase and more ``smooth'' image.
+Motivation behind different phase neighbors (DPN) sampler is simple: we take a
+sample $s_c$ from an image and look at its neighbors. If a number of neighbors
+which have a phase different from a phase of $s_c$ is high when probably this
+sample is ``lost'' in a region of alien phase and is subject for
+modification. The goal is to create regions of (locally) the same phase and more
+``smooth'' image.
 
 A probability of taking any fixed sample $s_c$ with a uniform sampler described
 in \cref{sec:sampler-uniform} is $P = \frac{1}{N}$ where $N$ is a total number
@@ -267,7 +273,7 @@ sample $s_c$ equals to
   P(A) = \sum_{i = 0}^{n-1} P(A|B_i) P(B_i) = \frac{1}{N}
 \end{equation*}
 where $P(B_i) = \frac{N_i}{N}$ and $P(A|B_i) = \frac{1}{N_i}$ if $s_c \in S_i$
-and zero otherwise. $N_i$ is these equations means a number of samples in the
+and zero otherwise. $N_i$ in these equations means a number of samples in the
 set $S_i$.
 
 The sampling method described in \cref{sec:sampler-uniform} is equivalent to
@@ -287,19 +293,40 @@ where $\beta$ can be found from an equation
 \end{equation*}
 
 The disjoint sets $S_i$ are chosen by analizing the number of different phase
-neighbors for each voxel or pixel. A sample $x$ belongs to the set $S_i$ if a
-set $\left\{ x_j: \rho(x, x_j) = 1 \land A(x_j) \ne A(x) \right\}$  contains $i$
-elements. Here $\rho(x,y)$ denotes the Chebyshev distance. The sampling
-algorithm consists of the previosly described two steps with the probability
+neighbors for each voxel or pixel. A sample $s$ belongs to the set $S_i$ if a
+set $\left\{ s_j: \rho(s, s_j) = 1 \land A(s_j) \ne A(s) \right\}$  contains $i$
+elements. Here $\rho(x,y)$ denotes the Chebyshev distance. Totally, there are 9
+sets $S_i$ for 2D image and 27 sets for 3D image. The sampling algorithm
+consists of the previosly described two steps with the probability
 $\frac{N_i}{N}$ replaced by \cref{eq:prob-dpn}.
 
 \subsection{Sampling on the phase interface}
 \label{sec:sampler-interface}
-This sampler generates a random starting index $S_0$ in $A$ and a vector
+This sampler generates a random starting index $s_0$ in $A$ and a vector
 $\delta: |\delta| = 1$. Then it finds minimal positive $n$ so that
-$A(s_0) \ne A(s_0 + n\delta)$. An index $s_0 + \lfloor n\delta \rfloor$ is a new
-sample. The point is that all samples generated this way belong to an interface
-between phases.
+$A(s_0) \ne A(s_0 + \lfloor n\delta \rfloor)$. An index
+$s_0 + \lfloor n\delta \rfloor$ is a new sample. The point is that all samples
+generated this way belong to an interface between phases.
+
+In practice we use this sampler solely because it is easily implemented, does
+not require any internal state and provides fast decrease of the target function
+after a small period of ``warm-up''. Another possibly good sampler is a DPN
+sampler which can result in even faster decrease of the target function in
+initial stage of the annealing process. A comparison of samplers in on
+\cref{fig:sampler-comparison}. The comparison is made for reconstruction of an
+image of value noise with dimensions $1000 \times 1000$ with white noise as an
+initial approximation. The swapper modifier and Aarts-Korst cooldown schedule
+are used in all cases.
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=0.9\linewidth]{../target-plots/sampler-comparison.png}
+  \caption[]{A comparison of different sampling algorithms. The plot depicts a
+    relation between the target function and a number of iterations of the
+    annealing algorithm. Reconstruction of value noise with white noise as an
+    initial approximation.}
+  \label{fig:sampler-comparison}
+\end{figure}
 
 \subsection{Flipper modifier}
 \label{sec:flipper}
@@ -365,14 +392,29 @@ where $\overline{E}_l$ is mean value of target function calculated for
 steps $l-n,\dots,n$ and $\sigma_l$ is standard deviation of values of
 target function for the same range of steps and $\hat{E}_0 = \overline{E}_0$.
 
+\section{Implementation in Julua language}
+\label{sec:julia-code}
+All algorithms described in this paper are implemented in our package
+\code{MaterialReconstruction.jl} written in Julia language. This package
+consists of a core framework for simulated annealing and a set of samplers,
+modifiers, target functions and cooldown schedules. This package is registered
+in Julia's General Registry and the source code can be found at
+github \footnote{\url{https://github.com/shamazmazum/MaterialReconstruction.jl}}.
+(\textbf{Create an organization for it? Is it possible now?}). The package is
+used in conjunction with
+\code{CorrelationTrackers.jl} \footnote{\url{https://github.com/shamazmazum/CorrelationTrackers.jl}}
+which is a package for calculating and updating correlation functions during the
+annealing process.
+
 \section{Results}
 In this section we provide reconstructions of some two-dimensional images
 including a checkerboard, randomly generated overlapping monodisperse disks,
 rotated and thresholded value noise and a sandstone. The images are
 reconstructed using two sets of correlation functions:
 \begin{enumerate}
-\item Two-point correlation function $S_2(r)$ and lineal-path correlation
-  functions for solid $L_2^{(1)}(r)$ and void $L_2^{(0)}(r)$ phases.
+\item Two-point correlation function $S_2^{(void)}(r)$ for void phase and
+  lineal-path correlation functions for solid $L_2^{(solid)}(r)$ and void
+  $L_2^{(void)}(r)$ phases.
 \item Functions from the first set plus surface-surface correlation function
   $F_{ss}(r)$ and surface-void correlation function $F_{sv}(r)$.
 \end{enumerate}
@@ -411,11 +453,17 @@ reconstructed and original correlation functions is on
 \cref{fig:disks-corr-s2l2} -- \cref{fig:disks-corr-all}.
 
 \subsection{Value noise}
-The original image has dimensions 1000x1000 pixels and was produced by
-generating two dimensional value noise with \verb+ValueNoise.jl+ package,
+The original image has dimensions $1000 \times 1000$ pixels and was produced by
+generating two dimensional value noise with \code{ValueNoise.jl} package,
 thresholding and rotating it on $-\pi/4$ radians. A set of overlapping spheres
 was used as an initial approximation of the original images, and the sampler
 used in reconstruction procedure is described in \cref{sec:sampler-interface}.
+The results are on \cref{fig:noise-corr-s2l2} -- \cref{fig:noise-corr-all}.
+
+\subsection{Sandstone}
+Conditions for this reconstructions are the same as in the previous
+section. (???) sandstone was used for the original image. The results are on
+\cref{fig:sandstone-corr-s2l2} -- \cref{fig:sandstone-corr-all}.
 
 \begin{figure*}[htp]
   \centering
@@ -547,8 +595,6 @@ used in reconstruction procedure is described in \cref{sec:sampler-interface}.
   \label{fig:corrfn-diff2}
 \end{figure*}
 
-
-\onecolumngrid
 \bibliography{biblio}
 \bibliographystyle{plain}
 
