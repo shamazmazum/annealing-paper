@@ -7,4 +7,4 @@ annealing.pdf: annealing.tex
 all: annealing.pdf
 
 clean: .PHONY
-	rm -f *.aux *.log *.bbl *.blg annealingNotes.bib
+	rm -f *.aux *.log *.bbl *.blg *.out annealingNotes.bib
